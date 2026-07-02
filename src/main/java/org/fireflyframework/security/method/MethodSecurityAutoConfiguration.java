@@ -24,6 +24,7 @@ import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Role;
+import org.springframework.core.env.Environment;
 import org.springframework.security.authorization.method.AuthorizationManagerBeforeReactiveMethodInterceptor;
 import org.springframework.security.config.annotation.method.configuration.EnableReactiveMethodSecurity;
 
@@ -37,9 +38,10 @@ public class MethodSecurityAutoConfiguration {
 
     @Bean
     @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
-    public AuthorizationManagerBeforeReactiveMethodInterceptor fireflySecureMethodInterceptor() {
+    public AuthorizationManagerBeforeReactiveMethodInterceptor fireflySecureMethodInterceptor(Environment environment) {
         Pointcut pointcut = new ComposablePointcut(new AnnotationMatchingPointcut(null, Secure.class, true))
                 .union(new AnnotationMatchingPointcut(Secure.class, true));
-        return new AuthorizationManagerBeforeReactiveMethodInterceptor(pointcut, new SecureMethodAuthorizationManager());
+        return new AuthorizationManagerBeforeReactiveMethodInterceptor(
+                pointcut, new SecureMethodAuthorizationManager(environment::resolvePlaceholders));
     }
 }

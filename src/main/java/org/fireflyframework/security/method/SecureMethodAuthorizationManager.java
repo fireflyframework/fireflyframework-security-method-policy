@@ -29,15 +29,29 @@ import org.springframework.security.core.Authentication;
 import reactor.core.publisher.Mono;
 
 import java.lang.reflect.Method;
+import java.util.function.UnaryOperator;
 
 /**
  * Reactive {@link ReactiveAuthorizationManager} that enforces the {@link Secure} annotation on
  * methods (or their declaring class) using the framework's {@link SecureAuthorizationEvaluator}.
  * Fail-closed: an unauthenticated caller, or one that does not satisfy the requirement, is denied.
+ *
+ * <p>Declared roles/scopes/permissions are passed through a {@code valueResolver} (Spring property
+ * placeholders when wired by the auto-config), so services can externalise per-product authority names,
+ * e.g. {@code @Secure(roles = "${idp.security.admin-role:idp-admin}")}. Literal values are unaffected.</p>
  */
 public class SecureMethodAuthorizationManager implements ReactiveAuthorizationManager<MethodInvocation> {
 
     private final SecureAuthorizationEvaluator evaluator = new SecureAuthorizationEvaluator();
+    private final UnaryOperator<String> valueResolver;
+
+    public SecureMethodAuthorizationManager() {
+        this(UnaryOperator.identity());
+    }
+
+    public SecureMethodAuthorizationManager(UnaryOperator<String> valueResolver) {
+        this.valueResolver = valueResolver == null ? UnaryOperator.identity() : valueResolver;
+    }
 
     @Override
     public Mono<AuthorizationDecision> check(Mono<Authentication> authentication, MethodInvocation invocation) {
@@ -45,7 +59,7 @@ public class SecureMethodAuthorizationManager implements ReactiveAuthorizationMa
         if (secure == null) {
             return Mono.just(new AuthorizationDecision(true));
         }
-        SecureRequirement requirement = SecureRequirement.from(secure);
+        SecureRequirement requirement = SecureRequirement.from(secure, valueResolver);
         return authentication
                 .filter(Authentication::isAuthenticated)
                 .map(auth -> new AuthorizationDecision(
